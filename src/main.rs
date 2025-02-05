@@ -32,7 +32,7 @@ async fn add_notes(client: &Client, paths: ReadDir) {
         let client = client.clone();
         async move {
             let notes = get_notes_batch(g);
-            client.index("Notes").add_documents(&notes, None).await.unwrap();
+            client.index("New_Notes").add_documents(&notes, None).await.unwrap();
             println!("new chunk of {} files has been indexed",batch_size);
         }
     }).await;
@@ -41,12 +41,12 @@ async fn add_notes(client: &Client, paths: ReadDir) {
 fn get_notes_batch(g: Chunk<ReadDir>) -> Vec<Note> {
     let notes: Vec<Note> = g.map(|p| {
         let path = p.unwrap().path();
-        let content = fs::read_to_string(&path);
+        let content = fs::read_to_string(&path).unwrap().lines().map(|l| l.to_string()).collect();
         let note = Note {
             id: get_id(),
             title: path.file_name().unwrap().to_str().unwrap().to_string(),
             path: path.to_str().unwrap().to_string(),
-            contents: content.unwrap()
+            contents: content
         };
         note
     }).collect();
@@ -58,5 +58,5 @@ struct Note {
     id:usize,
     title: String,
     path: String,
-    contents: String,
+    contents: Vec<String>,
 }
