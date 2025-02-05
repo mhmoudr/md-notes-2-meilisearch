@@ -4,13 +4,7 @@ use meilisearch_sdk::client::Client;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::fs::ReadDir;
-use std::sync::atomic::{AtomicUsize, Ordering};
 
-
-fn get_id() -> usize {
-    static COUNTER:AtomicUsize = AtomicUsize::new(1);
-    COUNTER.fetch_add(1, Ordering::Relaxed)
-}
 #[tokio::main] // Use Tokio's main macro to start the runtime
 async fn main() {
     println!("Start indexing!");
@@ -19,6 +13,10 @@ async fn main() {
     let path_to_notes = "../../projects/notes/".to_owned();
     let journals = path_to_notes.clone() + "/journals/";
     let pages = path_to_notes.clone() + "/pages/";
+
+    //just in case needed for clean up
+    //client.index("New_Notes1").delete().await.unwrap();
+
 
     let journals_paths = fs::read_dir(journals).unwrap();
     let pages_paths = fs::read_dir(pages).unwrap();
@@ -32,7 +30,7 @@ async fn add_notes(client: &Client, paths: ReadDir) {
         let client = client.clone();
         async move {
             let notes = get_notes_batch(g);
-            client.index("New_Notes").add_documents(&notes, None).await.unwrap();
+            client.index("Notes").add_documents(&notes, Some("title")).await.unwrap();
             println!("new chunk of {} files has been indexed",batch_size);
         }
     }).await;
@@ -42,20 +40,17 @@ fn get_notes_batch(g: Chunk<ReadDir>) -> Vec<Note> {
     let notes: Vec<Note> = g.map(|p| {
         let path = p.unwrap().path();
         let content = fs::read_to_string(&path).unwrap().lines().map(|l| l.to_string()).collect();
-        let note = Note {
-            id: get_id(),
-            title: path.file_name().unwrap().to_str().unwrap().to_string(),
+        Note {
+            title: path.file_stem().unwrap().to_str().unwrap().to_string().chars().filter(|c| !c.is_whitespace() && c.is_alphanumeric()).collect(),
             path: path.to_str().unwrap().to_string(),
             contents: content
-        };
-        note
+        }
     }).collect();
     notes
 }
 
 #[derive(Serialize, Deserialize)]
 struct Note {
-    id:usize,
     title: String,
     path: String,
     contents: Vec<String>,
